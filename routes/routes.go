@@ -66,6 +66,8 @@ func Init() *echo.Echo {
 		SigningKey: []byte(conf.SECRET_TOKEN_A),
 	}
 
+	e.POST("/try/upload/pdf", CR.UploadBookPdfToImage)
+
 	//static files
 	e.Static("/uploads", "uploads")
 
