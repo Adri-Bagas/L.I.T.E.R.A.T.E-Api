@@ -113,6 +113,16 @@ func Init() *echo.Echo {
 	publisherRoute.GET("/:id", CR.FindPublisher)
 	//Publisher Group End
 
+	//Category Group Start
+	categoryRoute := e.Group("/category")
+	categoryRoute.Use(echojwt.WithConfig(config))
+	categoryRoute.GET("", CR.GetAllCategory)
+	categoryRoute.POST("", CR.CreateCategory)
+	categoryRoute.PUT("/:id", CR.UpdateCategory)
+	categoryRoute.DELETE("/:id", CR.DeletedCategory)
+	categoryRoute.GET("/:id", CR.FindCategory)
+	//Category Group End
+
 	//Login
 	e.POST("/auth/login", CR.Login)
 	//Auth

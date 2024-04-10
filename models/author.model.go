@@ -147,7 +147,7 @@ func CreateAuthor(author *Author) (ResponseNoData, error) {
 		res.Status = http.StatusInternalServerError
 		res.Msg = err.Error()
 		res.Success = false
-		return res, nil
+		return res, err
 	}
 
 	res.Status = http.StatusOK
@@ -175,7 +175,7 @@ func DeleteAuthor(id int64) (ResponseNoData, error) {
 		res.Status = http.StatusInternalServerError
 		res.Msg = err.Error()
 		res.Success = false
-		return res, nil
+		return res, err
 	}
 
 	res.Status = http.StatusOK
@@ -205,7 +205,7 @@ func UpdateAuthor(author *Author) (ResponseNoData, error) {
 		res.Status = http.StatusInternalServerError
 		res.Msg = err.Error()
 		res.Success = false
-		return res, nil
+		return res, err
 	}
 
 	res.Status = http.StatusOK

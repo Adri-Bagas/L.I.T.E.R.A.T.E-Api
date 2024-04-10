@@ -5,6 +5,9 @@ import (
 	A "perpus_api/db"
 	H "perpus_api/helpers"
 	"sync"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v4"
 )
 
 type User struct {
@@ -193,7 +196,7 @@ func CreateUser(password string, username string, email string, role int64) (Res
 		res.Status = http.StatusInternalServerError
 		res.Msg = err.Error()
 		res.Success = false
-		return res, nil
+		return res, err
 	}
 
 	res.Status = http.StatusOK
@@ -221,7 +224,7 @@ func DeleteUser(id int64) (ResponseNoData, error) {
 		res.Status = http.StatusInternalServerError
 		res.Msg = err.Error()
 		res.Success = false
-		return res, nil
+		return res, err
 	}
 
 	res.Status = http.StatusOK
@@ -251,7 +254,7 @@ func UpdateUser(id int64, password string, username string, email string, role i
 		res.Status = http.StatusInternalServerError
 		res.Msg = err.Error()
 		res.Success = false
-		return res, nil
+		return res, err
 	}
 
 	res.Status = http.StatusOK
@@ -328,4 +331,20 @@ func SetUserProfilePic(path string, id int64) error {
 	_, err := con.Exec(sql, id, path)
 
 	return err
+}
+
+func GetUserDataByJWT(c echo.Context) (*JwtCustomClaims, *string) {
+
+	var errM string
+
+	user, ok := c.Get("user").(*jwt.Token)
+
+	if !ok {
+		errM = "JWT token missing or invalid"
+		return nil, &errM
+	}
+
+	claims := user.Claims.(*JwtCustomClaims)
+
+	return claims, nil
 }

@@ -18,12 +18,16 @@ import (
 )
 
 type BookForm struct {
-	ISBN        string `json:"ISBN" validate:"required"`
-	Title       string `json:"address" validate:"required"`
-	Lang        string `json:"phone_number" validate:"required"`
-	NumOfPages  int    `json:"num_of_pages" validate:"required"`
-	AuthorId    int64  `json:"author_id" validate:"required"`
-	PublisherId int64  `json:"publisher_id" validate:"required"`
+	ISBN        string    `json:"ISBN" validate:"required"`
+	Title       string    `json:"title" validate:"required"`
+	Lang        string    `json:"lang" validate:"required"`
+	NumOfPages  int       `json:"num_of_pages" validate:"required"`
+	AuthorId    []int64   `json:"author_id" validate:"required"`
+	PublisherId int64     `json:"publisher_id" validate:"required"`
+	CategoryId  []int64   `json:"category_id" validate:"required"`
+	Tags        *[]string `json:"tags"`
+	Price       *int      `json:"price"`
+	Desc        *string   `json:"desc"`
 }
 
 func GetAllBook(c echo.Context) error {
@@ -38,39 +42,35 @@ func GetAllBook(c echo.Context) error {
 
 func CreateBook(c echo.Context) error {
 
-	parsed, err := strconv.Atoi(c.FormValue("num_of_pages"))
+	requestBody := new(BookForm)
 
-	if err != nil {
+	if err := c.Bind(requestBody); err != nil {
+		return err
+	}
+
+	if err := c.Validate(requestBody); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"msg": err.Error()})
 	}
 
-	b := &BookForm{
-		ISBN:       c.FormValue("isbn"),
-		Title:      c.FormValue("title"),
-		Lang:       c.FormValue("lang"),
-		NumOfPages: parsed,
+	claims, errm := M.GetUserDataByJWT(c)
+
+	if errm != nil {
+		c.JSON(http.StatusBadRequest, map[string]string{"msg": *errm})
 	}
 
-	if err := c.Validate(b); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"msg": err.Error()})
-	}
-
-	parsedP, _ := strconv.Atoi(c.FormValue("price"))
-
-	parsedCB, _ := strconv.ParseInt(c.FormValue("created_by"), 10, 64)
+	parsedCB := int64(claims.ID)
 
 	bo := &M.Book{
-		ISBN:       b.ISBN,
-		Title:      b.Title,
-		Lang:       b.Lang,
-		NumOfPages: b.NumOfPages,
-		Price:      &parsedP,
-		Desc:       c.FormValue("desc"),
-		Sypnosis:   c.FormValue("sypnosis"),
+		ISBN:       requestBody.ISBN,
+		Title:      requestBody.Title,
+		Lang:       requestBody.Lang,
+		NumOfPages: requestBody.NumOfPages,
+		Price:      requestBody.Price,
+		Desc:       requestBody.Desc,
 		CreatedBy:  &parsedCB,
 	}
 
-	res, err := M.CreateBook(bo)
+	res, err := M.CreateBook(bo, requestBody.AuthorId, requestBody.CategoryId, *requestBody.Tags)
 
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, res)
@@ -87,56 +87,37 @@ func UpdateBook(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"msg": err.Error()})
 	}
 
-	parsed, err := strconv.Atoi(c.FormValue("num_of_pages"))
+	requestBody := new(BookForm)
 
-	if err != nil {
+	if err := c.Bind(requestBody); err != nil {
+		return err
+	}
+
+	if err := c.Validate(requestBody); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"msg": err.Error()})
 	}
 
-	authorId, err := strconv.ParseInt(c.FormValue("author_id"), 10, 64)
+	claims, errm := M.GetUserDataByJWT(c)
 
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"msg": err.Error()})
+	if errm != nil {
+		c.JSON(http.StatusBadRequest, map[string]string{"msg": *errm})
 	}
 
-	publisherId, err := strconv.ParseInt(c.FormValue("publisher_id"), 10, 64)
-
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"msg": err.Error()})
-	}
-
-	b := &BookForm{
-		ISBN:        c.FormValue("isbn"),
-		Title:       c.FormValue("title"),
-		Lang:        c.FormValue("lang"),
-		NumOfPages:  parsed,
-		AuthorId:    authorId,
-		PublisherId: publisherId,
-	}
-
-	if err := c.Validate(b); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"msg": err.Error()})
-	}
-
-	parsedP, _ := strconv.Atoi(c.FormValue("price"))
-
-	parsedCB, _ := strconv.ParseInt(c.FormValue("updated_by"), 10, 64)
+	parsedCB := int64(claims.ID)
 
 	bo := &M.Book{
 		Id:          int(bookId),
-		ISBN:        b.ISBN,
-		Title:       b.Title,
-		Lang:        b.Lang,
-		NumOfPages:  b.NumOfPages,
-		Price:       &parsedP,
-		Desc:        c.FormValue("desc"),
-		Sypnosis:    c.FormValue("sypnosis"),
+		ISBN:        requestBody.ISBN,
+		Title:       requestBody.Title,
+		Lang:        requestBody.Lang,
+		NumOfPages:  requestBody.NumOfPages,
+		Price:       requestBody.Price,
+		Desc:        requestBody.Desc,
 		CreatedBy:   &parsedCB,
-		AuthorId:    &b.AuthorId,
-		PublisherId: &b.PublisherId,
+		PublisherId: &requestBody.PublisherId,
 	}
 
-	res, err := M.UpdateBook(bo)
+	res, err := M.UpdateBook(bo, requestBody.AuthorId, requestBody.CategoryId, *requestBody.Tags)
 
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, res)

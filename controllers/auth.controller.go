@@ -56,7 +56,7 @@ func Login(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, res)
 	}
 
-	if(userData.Role != 1){
+	if(userData.Role == 0){
 		res.Status = http.StatusUnauthorized
 		res.Msg = "Unauthorized!"
 		res.Success = false

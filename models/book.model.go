@@ -3,6 +3,8 @@ package models
 import (
 	"net/http"
 	A "perpus_api/db"
+	"regexp"
+	"strings"
 	"sync"
 )
 
@@ -13,15 +15,13 @@ type Book struct {
 	Lang        string  `json:"phone_number" db:"phone_number"`
 	NumOfPages  int     `json:"num_of_pages" db:"num_of_pages"`
 	Price       *int    `json:"price" db:"price"`
-	Desc        string  `json:"desc" db:"desc"`
-	Sypnosis    string  `json:"sypnosis" db:"sypnosis"`
+	Desc        *string `json:"desc" db:"desc"`
 	CreatedAt   *string `db:"created_at" json:"created_at"`
 	UpdatedAt   *string `db:"updated_at" json:"updated_at"`
 	DeletedAt   *string `db:"deleted_at" json:"deleted_at"`
 	CreatedBy   *int64  `db:"created_by" json:"created_by"`
 	UpdatedBy   *int64  `db:"updated_by" json:"updated_by"`
 	DeletedBy   *int64  `db:"deleted_by" json:"deleted_by"`
-	AuthorId    *int64  `db:"author_id" json:"author_id"`
 	PublisherId *int64  `db:"publisher_id" json:"publisher_id"`
 }
 
@@ -58,7 +58,6 @@ func GetAllBook() (ResponseMultiple, error) {
 			&obj.Lang,
 			&obj.NumOfPages,
 			&obj.Price,
-			&obj.Sypnosis,
 			&obj.CreatedAt,
 			&obj.UpdatedAt,
 			&obj.DeletedAt,
@@ -115,7 +114,6 @@ func FindBook(id int64) (Response, error) {
 			&obj.Lang,
 			&obj.NumOfPages,
 			&obj.Price,
-			&obj.Sypnosis,
 			&obj.CreatedAt,
 			&obj.UpdatedAt,
 			&obj.DeletedAt,
@@ -141,36 +139,71 @@ func FindBook(id int64) (Response, error) {
 	return res, nil
 }
 
-func CreateBook(book *Book) (ResponseNoData, error) {
+func CreateBook(book *Book, authorId []int64, categoryId []int64, tags []string) (ResponseNoData, error) {
 
 	BookLock.Lock()
 	defer BookLock.Unlock()
 
 	var res ResponseNoData
 
-	var desc *string
-
-	var syp *string
-
-	if book.Desc == "" {desc = nil} else {desc = &book.Desc}
-
-	if book.Sypnosis == "" {syp = nil} else {syp = &book.Sypnosis}
-
 	con := A.GetDB()
 
 	sql := `
 		INSERT INTO public.books(
-		"ISBN", title, lang, num_of_pages, price, created_at, created_by, author_id, publisher_id, "desc", sypnosis)
-		VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9, $10);
+		"ISBN", title, lang, num_of_pages, price, created_at, created_by, publisher_id, "desc")
+		VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8) RETURNING id;
 	`
 
-	_, err := con.Exec(sql, book.ISBN, book.Title, book.Lang, book.Title, book.NumOfPages, book.Price, book.CreatedBy, book.AuthorId, book.PublisherId, desc, syp)
+	var id *int
+
+	err := con.QueryRow(
+		sql, book.ISBN, book.Title, book.Lang, book.Title, book.NumOfPages, book.Price, book.CreatedBy, book.PublisherId, book.Desc,
+	).Scan(&id)
 
 	if err != nil {
 		res.Status = http.StatusInternalServerError
 		res.Msg = err.Error()
 		res.Success = false
-		return res, nil
+		return res, err
+	}
+
+	sql = `
+		insert into public.author_book(author_id, book_id) values ($1, $2)
+	`
+
+	for _, e := range authorId {
+		_, err := con.Exec(sql, e, id)
+
+		if err != nil {
+			res.Status = http.StatusInternalServerError
+			res.Msg = err.Error()
+			res.Success = false
+			return res, err
+		}
+	}
+
+	sql = `
+		insert into public.book_category(category_id, book_id) values ($1, $2)
+	`
+
+	for _, e := range categoryId {
+		_, err := con.Exec(sql, e, id)
+
+		if err != nil {
+			res.Status = http.StatusInternalServerError
+			res.Msg = err.Error()
+			res.Success = false
+			return res, err
+		}
+	}
+
+	err = CreateBookTags(tags, *id, false)
+
+	if err != nil {
+		res.Status = http.StatusInternalServerError
+		res.Msg = err.Error()
+		res.Success = false
+		return res, err
 	}
 
 	res.Status = http.StatusOK
@@ -178,6 +211,56 @@ func CreateBook(book *Book) (ResponseNoData, error) {
 	res.Success = true
 
 	return res, nil
+}
+
+func CreateBookTags(tags []string, bookId int, isEdit bool) error {
+
+	con := A.GetDB()
+
+	sql := "insert into public.book_tag(book_id, tag_id) values ($1, $2)"
+
+	sqlCreateTag := "insert into public.tags(name) values ($1) RETURNING id"
+
+	sqlCheckTag := "select id from public.tags where name = $1"
+
+	if isEdit {
+		sqlDeleteConnection := "delete from public.book_tag where book_id = $1"
+
+		_, err := con.Exec(sqlDeleteConnection, bookId)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, tag := range tags {
+		var tagID *int
+
+		re := regexp.MustCompile(`^\s+|\s+`)
+		cleanedStr := re.ReplaceAllString(tag, "")
+
+		formattedTagName := strings.Replace(strings.ToLower(cleanedStr), " ", "-", -1)
+
+		con.QueryRow(sqlCheckTag, formattedTagName).Scan(&tagID)
+
+		if tagID == nil {
+			err := con.QueryRow(sqlCreateTag, formattedTagName).Scan(&tagID)
+
+			if err != nil {
+				return err
+			}
+		}
+
+		_, err := con.Exec(sql, bookId, tagID)
+
+		if err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+
 }
 
 func DeleteBook(id int64) (ResponseNoData, error) {
@@ -198,7 +281,7 @@ func DeleteBook(id int64) (ResponseNoData, error) {
 		res.Status = http.StatusInternalServerError
 		res.Msg = err.Error()
 		res.Success = false
-		return res, nil
+		return res, err
 	}
 
 	res.Status = http.StatusOK
@@ -208,35 +291,54 @@ func DeleteBook(id int64) (ResponseNoData, error) {
 	return res, nil
 }
 
-func UpdateBook(book *Book) (ResponseNoData, error) {
+func UpdateBook(book *Book, authorId []int64, categoryId []int64, tags []string) (ResponseNoData, error) {
 	BookLock.Lock()
 	defer BookLock.Unlock()
 
 	var res ResponseNoData
 
-	var desc *string
-
-	var syp *string
-
-	if book.Desc == "" {desc = nil} else {desc = &book.Desc}
-
-	if book.Sypnosis == "" {syp = nil} else {syp = &book.Sypnosis}
-
 	con := A.GetDB()
 
 	sql := `
 		UPDATE public.books
-			SET "ISBN" = $1, title = $2, lang = $3, num_of_pages = $4, price = $5, updated_at = NOW(), updated_by = $6, author_id = $7, publisher_id = $8, "desc" = $9, sypnosis = $10
-		WHERE id= $12
+			SET "ISBN" = $1, title = $2, lang = $3, num_of_pages = $4, price = $5, updated_at = NOW(), updated_by = $6, publisher_id = $7, "desc" = $8
+		WHERE id= $9
 	`
 
-	_, err := con.Exec(sql, book.Id, book.Title, book.Lang, book.NumOfPages, book.Price, book.UpdatedBy, book.AuthorId, book.PublisherId, desc, syp)
+	_, err := con.Exec(sql, book.ISBN, book.Title, book.Lang, book.NumOfPages, book.Price, book.UpdatedBy, book.PublisherId, book.Desc, book.Id)
 
 	if err != nil {
 		res.Status = http.StatusInternalServerError
 		res.Msg = err.Error()
 		res.Success = false
-		return res, nil
+		return res, err
+	}
+
+	err = checkAuthorBook(book.Id, authorId)
+
+	if err != nil {
+		res.Status = http.StatusInternalServerError
+		res.Msg = err.Error()
+		res.Success = false
+		return res, err
+	}
+
+	err = checkCategoryBook(book.Id, categoryId)
+
+	if err != nil {
+		res.Status = http.StatusInternalServerError
+		res.Msg = err.Error()
+		res.Success = false
+		return res, err
+	}
+
+	err = CreateBookTags(tags, book.Id, true)
+
+	if err != nil {
+		res.Status = http.StatusInternalServerError
+		res.Msg = err.Error()
+		res.Success = false
+		return res, err
 	}
 
 	res.Status = http.StatusOK
@@ -244,6 +346,54 @@ func UpdateBook(book *Book) (ResponseNoData, error) {
 	res.Success = true
 
 	return res, nil
+}
+
+func checkAuthorBook(bookId int, authorIds []int64) error {
+	con := A.GetDB()
+
+	sql := "insert into public.author_book(author_id, book_id) values ($1, $2)"
+
+	sqlDeleteAll := "DELETE FROM public.author_book WHERE book_id = $1;"
+
+	_, err := con.Exec(sqlDeleteAll, bookId)
+
+		if err != nil {
+			return err
+		}
+
+	for _, author := range authorIds {
+		_, err := con.Exec(sql, author, bookId)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func checkCategoryBook(bookId int, categoryIds []int64) error {
+	con := A.GetDB()
+
+	sql := "insert into public.book_category(category_id, book_id) values ($1, $2)"
+
+	sqlDeleteAll := "DELETE FROM public.book_category WHERE book_id = $1;"
+
+	_, err := con.Exec(sqlDeleteAll, bookId)
+
+		if err != nil {
+			return err
+		}
+
+	for _, category := range categoryIds {
+		_, err := con.Exec(sql, category, bookId)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func WhereBook(col string, val string) (*Book, error) {
@@ -270,7 +420,6 @@ func WhereBook(col string, val string) (*Book, error) {
 			&obj.Lang,
 			&obj.NumOfPages,
 			&obj.Price,
-			&obj.Sypnosis,
 			&obj.CreatedAt,
 			&obj.UpdatedAt,
 			&obj.DeletedAt,

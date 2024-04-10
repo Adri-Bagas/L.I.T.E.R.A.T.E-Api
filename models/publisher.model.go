@@ -151,7 +151,7 @@ func CreatePublisher(publisher *Publisher) (ResponseNoData, error) {
 		res.Status = http.StatusInternalServerError
 		res.Msg = err.Error()
 		res.Success = false
-		return res, nil
+		return res, err
 	}
 
 	res.Status = http.StatusOK
@@ -179,7 +179,7 @@ func DeletePublisher(id int64) (ResponseNoData, error) {
 		res.Status = http.StatusInternalServerError
 		res.Msg = err.Error()
 		res.Success = false
-		return res, nil
+		return res, err
 	}
 
 	res.Status = http.StatusOK
@@ -209,7 +209,7 @@ func UpdatePublisher(publisher *Publisher) (ResponseNoData, error) {
 		res.Status = http.StatusInternalServerError
 		res.Msg = err.Error()
 		res.Success = false
-		return res, nil
+		return res, err
 	}
 
 	res.Status = http.StatusOK
