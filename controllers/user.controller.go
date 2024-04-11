@@ -11,12 +11,6 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type UserForm struct {
-	Username string `json:"username" validate:"required"`
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required"`
-	Role     int64  `json:"role"`
-}
 
 func GetAllUser(c echo.Context) error {
 	res, err := M.GetAllUser(false)
@@ -46,18 +40,40 @@ func CreateUser(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"msg": err.Error()})
 	}
 
-	u := &UserForm{
-		Username: c.FormValue("username"),
-		Email:    c.FormValue("email"),
-		Password: c.FormValue("password"),
-		Role:     role,
+	var u M.UserForm
+
+	if role == 0 {
+		var (
+			full_name string
+			phone_number string
+			address string
+		)
+		full_name = c.FormValue("full_name")
+		phone_number = c.FormValue("phone_number")
+		address = c.FormValue("address")
+		u = M.UserForm{
+			Username:    c.FormValue("username"),
+			Email:       c.FormValue("email"),
+			Password:    c.FormValue("password"),
+			Role:        role,
+			FullName:    &full_name,
+			PhoneNumber: &phone_number,
+			Address:     &address,
+		}
+	} else {
+		u = M.UserForm{
+			Username: c.FormValue("username"),
+			Email:    c.FormValue("email"),
+			Password: c.FormValue("password"),
+			Role:     role,
+		}
 	}
 
 	if err := c.Validate(u); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"msg": err.Error()})
 	}
 
-	res, err := M.CreateUser(u.Password, u.Username, u.Email, u.Role)
+	res, err := M.CreateUser(u)
 
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, res)
@@ -80,7 +96,7 @@ func UpdateUser(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"msg": err.Error()})
 	}
 
-	u := &UserForm{
+	u := &M.UserForm{
 		Username: c.FormValue("username"),
 		Email:    c.FormValue("email"),
 		Password: c.FormValue("password"),
@@ -177,7 +193,7 @@ func SetUserProfilePic(c echo.Context) error {
 			)
 		}
 
-		err =  M.DeleteMedia(int64(find.Id))
+		err = M.DeleteMedia(int64(find.Id))
 
 		if err != nil {
 			return c.JSON(

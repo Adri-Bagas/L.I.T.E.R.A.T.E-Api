@@ -103,6 +103,94 @@ func Login(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
+func LoginMember(c echo.Context) error {
+
+	conf := config.GetConfig()
+
+	var res M.Response
+
+	email := c.FormValue("email")
+	password := c.FormValue("password")
+
+	memberData, err := M.WhereMember("email", email)
+
+	if err != nil {
+		res.Status = http.StatusInternalServerError
+		res.Msg = err.Error()
+		res.Success = false
+		return c.JSON(http.StatusInternalServerError, res)
+	}
+
+	if memberData.ID == 0 {
+		res.Status = http.StatusInternalServerError
+		res.Msg = "User not found!"
+		res.Success = false
+		return c.JSON(http.StatusInternalServerError, res)
+	}
+
+	check := H.CheckPasswordHash(password, memberData.Password)
+
+	if !check {
+		res.Status = http.StatusBadRequest
+		res.Msg = "Password do not match!"
+		res.Success = false
+
+		return c.JSON(http.StatusBadRequest, res)
+	}
+
+	err = M.SetMemberLastActive(memberData.ID)
+
+	if(err != nil){
+		res.Status = http.StatusBadRequest
+		res.Msg = err.Error()
+		res.Success = false
+
+		return c.JSON(http.StatusBadRequest, res)
+	}
+
+	claims := &M.JwtCustomClaims{
+		ID: int(memberData.ID),
+		Name:  memberData.Username,
+		Email: memberData.Email,
+		Role: 0,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 72)),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	t, err := token.SignedString([]byte(conf.SECRET_TOKEN_A))
+
+	if err != nil {
+
+		res.Status = http.StatusInternalServerError
+		res.Msg = err.Error()
+		res.Success = false
+
+		return c.JSON(http.StatusInternalServerError, res)
+	}
+
+	res.Status = http.StatusOK
+	res.Msg = "Login Success!"
+	res.Success = true
+	res.Data = echo.Map{
+		"token": t,
+		"user":  M.MemberSafe{
+			ID: memberData.ID,
+			Username: memberData.Username,
+			Email: memberData.Email,
+			LastActive: memberData.LastActive,
+			FullName: memberData.FullName,
+			PhoneNumber: memberData.PhoneNumber,
+			Address: memberData.Address,
+			ProfilePic: memberData.ProfilePic,
+		},
+	}
+
+	return c.JSON(http.StatusOK, res)
+}
+
 func GetMe(c echo.Context) error {
 	user, ok := c.Get("user").(*jwt.Token)
 

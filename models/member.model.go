@@ -10,32 +10,34 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type User struct {
-	ID         int64   `db:"id" json:"id"`
-	Username   string  `db:"username" json:"username"`
-	Email      string  `db:"email" json:"email"`
-	Password   string  `db:"password" json:"password"`
-	LastActive *string `db:"last_active" json:"last_active"`
-	CreatedAt  *string `db:"created_at" json:"created_at"`
-	UpdatedAt  *string `db:"updated_at" json:"updated_at"`
-	DeletedAt  *string `db:"deleted_at" json:"deleted_at"`
-	CreatedBy  *int64  `db:"created_by" json:"created_by"`
-	UpdatedBy  *int64  `db:"updated_by" json:"updated_by"`
-	DeletedBy  *int64  `db:"deleted_by" json:"deleted_by"`
-	Role       int     `db:"role" json:"role"`
-	ProfilePic *string `db:"profile_pic" json:"profile_pic"`
+type Member struct {
+	ID          int64   `db:"id" json:"id"`
+	Username    string  `db:"username" json:"username"`
+	FullName    string  `db:"full_name" json:"full_name"`
+	Email       string  `db:"email" json:"email"`
+	Password    string  `db:"password" json:"password"`
+	PhoneNumber string  `db:"phone_number" json:"phone_number"`
+	Address     string  `db:"address" json:"address"`
+	CreatedAt   *string `db:"created_at" json:"created_at"`
+	UpdatedAt   *string `db:"updated_at" json:"updated_at"`
+	DeletedAt   *string `db:"deleted_at" json:"deleted_at"`
+	LastActive  *string `db:"last_active" json:"last_active"`
+	ProfilePic  *string `db:"profile_pic" json:"profile_pic"`
 }
 
-type UserSafe struct {
-	ID         int64   `json:"id"`
-	Username   string  `json:"username"`
-	Email      string  `json:"email"`
-	LastActive *string `json:"last_active"`
-	DeletedAt  *string `json:"deleted_at"`
-	ProfilePic *string `json:"profile_pic"`
+type MemberSafe struct {
+	ID          int64   `json:"id"`
+	Username    string  `json:"username"`
+	FullName    string  `db:"full_name" json:"full_name"`
+	Email       string  `json:"email"`
+	LastActive  *string `json:"last_active"`
+	DeletedAt   *string `json:"deleted_at"`
+	PhoneNumber string  `json:"phone_number"`
+	Address     string  `json:"address"`
+	ProfilePic  *string `json:"profile_pic"`
 }
 
-type UserForm struct {
+type MemberForm struct {
 	Username    string  `json:"username" validate:"required"`
 	Email       string  `json:"email" validate:"required,email"`
 	Password    string  `json:"password" validate:"required"`
@@ -45,11 +47,11 @@ type UserForm struct {
 	Address     *string `json:"address"`
 }
 
-var lock = sync.Mutex{}
+var Memberlock = sync.Mutex{}
 
-func GetAllUser(getThrashed bool) (ResponseMultiple, error) {
-	var obj User
-	var arrobj []UserSafe
+func GetAllMember(getThrashed bool) (ResponseMultiple, error) {
+	var obj Member
+	var arrobj []MemberSafe
 	var res ResponseMultiple
 
 	con := A.GetDB()
@@ -58,11 +60,11 @@ func GetAllUser(getThrashed bool) (ResponseMultiple, error) {
 
 	if !getThrashed {
 		sql = `
-			SELECT t1.*, t2.location as profile_pic FROM public.users t1 left join public.medias t2 on t1.id = t2.model_id where t1.deleted_at is null;
+			SELECT t1.*, t2.location as profile_pic FROM public.members t1 left join public.medias t2 on t1.id = t2.model_id where t1.deleted_at and model_name = "member" is null;
 		`
 	} else {
 		sql = `
-			SELECT t1.*, t2.location as profile_pic FROM public.users t1 left join public.medias t2 on t1.id = t2.model_id where t1.deleted_at is not null;
+			SELECT t1.*, t2.location as profile_pic FROM public.members t1 left join public.medias t2 on t1.id = t2.model_id where t1.deleted_at and model_name = "member" is not null;
 		`
 	}
 
@@ -82,16 +84,15 @@ func GetAllUser(getThrashed bool) (ResponseMultiple, error) {
 		err := rows.Scan(
 			&obj.ID,
 			&obj.Username,
+			&obj.FullName,
 			&obj.Email,
 			&obj.Password,
-			&obj.LastActive,
+			&obj.PhoneNumber,
+			&obj.Address,
 			&obj.CreatedAt,
 			&obj.UpdatedAt,
-			&obj.CreatedBy,
-			&obj.UpdatedBy,
 			&obj.DeletedAt,
-			&obj.DeletedBy,
-			&obj.Role,
+			&obj.LastActive,
 			&obj.ProfilePic,
 		)
 
@@ -102,13 +103,16 @@ func GetAllUser(getThrashed bool) (ResponseMultiple, error) {
 			return res, err
 		}
 
-		arrobj = append(arrobj, UserSafe{
-			ID:         obj.ID,
-			Username:   obj.Username,
-			Email:      obj.Email,
-			LastActive: obj.LastActive,
-			DeletedAt:  obj.DeletedAt,
-			ProfilePic: obj.ProfilePic,
+		arrobj = append(arrobj, MemberSafe{
+			ID:          obj.ID,
+			Username:    obj.Username,
+			Email:       obj.Email,
+			LastActive:  obj.LastActive,
+			DeletedAt:   obj.DeletedAt,
+			ProfilePic:  obj.ProfilePic,
+			PhoneNumber: obj.PhoneNumber,
+			FullName:    obj.FullName,
+			Address:     obj.Address,
 		})
 	}
 
@@ -120,15 +124,15 @@ func GetAllUser(getThrashed bool) (ResponseMultiple, error) {
 	return res, nil
 }
 
-func FindUser(id int64) (Response, error) {
-	var obj User
-	// var objSafe UserSafe
+func FindMember(id int64) (Response, error) {
+	var obj Member
+	// var objSafe MemberSafe
 	var res Response
 
 	con := A.GetDB()
 
 	sql := `
-		SELECT t1.*, t2.location as profile_pic FROM public.users t1 left join public.medias t2 on t1.id = t2.model_id WHERE t1.id = $1;
+		SELECT t1.*, t2.location as profile_pic FROM public.members t1 left join public.medias t2 on t1.id = t2.model_id WHERE t1.id = $1;
 	`
 
 	rows, err := con.Query(sql, id)
@@ -147,16 +151,15 @@ func FindUser(id int64) (Response, error) {
 		err := rows.Scan(
 			&obj.ID,
 			&obj.Username,
+			&obj.FullName,
 			&obj.Email,
 			&obj.Password,
-			&obj.LastActive,
+			&obj.PhoneNumber,
+			&obj.Address,
 			&obj.CreatedAt,
 			&obj.UpdatedAt,
-			&obj.CreatedBy,
-			&obj.UpdatedBy,
 			&obj.DeletedAt,
-			&obj.DeletedBy,
-			&obj.Role,
+			&obj.LastActive,
 			&obj.ProfilePic,
 		)
 
@@ -177,17 +180,17 @@ func FindUser(id int64) (Response, error) {
 	}
 
 	res.Status = http.StatusOK
-	res.Msg = "Users founded!"
+	res.Msg = "Members founded!"
 	res.Success = true
 	res.Data = obj
 
 	return res, nil
 }
 
-func CreateUser(d UserForm) (ResponseNoData, error) {
+func CreateMember(d MemberForm) (ResponseNoData, error) {
 
-	lock.Lock()
-	defer lock.Unlock()
+	Memberlock.Lock()
+	defer Memberlock.Unlock()
 
 	var res ResponseNoData
 
@@ -195,54 +198,38 @@ func CreateUser(d UserForm) (ResponseNoData, error) {
 
 	hashed, _ := H.HashPassword(d.Password)
 
-	if d.Role == 0 {
-		sql := `
+	sql := `
 		INSERT INTO public.members(
 			username, full_name, email, password, phone_number, address)
 			VALUES ($1, $2, $3, $4, $5, $6)
 		`
 
-		_, err := con.Exec(sql, d.Username, d.FullName, d.Email, hashed, d.PhoneNumber, d.Address)
+	_, err := con.Exec(sql, d.Username, d.FullName, d.Email, hashed, d.PhoneNumber, d.Address)
 
-		if err != nil {
-			res.Status = http.StatusInternalServerError
-			res.Msg = err.Error()
-			res.Success = false
-			return res, err
-		}
-	} else {
-		sql := `
-			INSERT INTO public.users(username, email, password, role)
-			VALUES ($1, $2, $3, $4);
-		`
-
-		_, err := con.Exec(sql, d.Username, d.Email, hashed, d.Role)
-
-		if err != nil {
-			res.Status = http.StatusInternalServerError
-			res.Msg = err.Error()
-			res.Success = false
-			return res, err
-		}
+	if err != nil {
+		res.Status = http.StatusInternalServerError
+		res.Msg = err.Error()
+		res.Success = false
+		return res, err
 	}
 
 	res.Status = http.StatusOK
-	res.Msg = "User created successfully"
+	res.Msg = "Member created successfully"
 	res.Success = true
 
 	return res, nil
 }
 
-func DeleteUser(id int64) (ResponseNoData, error) {
-	lock.Lock()
-	defer lock.Unlock()
+func DeleteMember(id int64) (ResponseNoData, error) {
+	Memberlock.Lock()
+	defer Memberlock.Unlock()
 
 	var res ResponseNoData
 
 	con := A.GetDB()
 
 	sql := `
-		UPDATE public.users SET deleted_at = NOW() WHERE id = $1;
+		UPDATE public.members SET deleted_at = NOW() WHERE id = $1;
 	`
 
 	_, err := con.Exec(sql, id)
@@ -255,15 +242,15 @@ func DeleteUser(id int64) (ResponseNoData, error) {
 	}
 
 	res.Status = http.StatusOK
-	res.Msg = "User trashed successfully"
+	res.Msg = "Member trashed successfully"
 	res.Success = true
 
 	return res, nil
 }
 
-func UpdateUser(id int64, password string, username string, email string, role int64) (ResponseNoData, error) {
-	lock.Lock()
-	defer lock.Unlock()
+func UpdateMember(id int64, password string, username string, email string, role int64) (ResponseNoData, error) {
+	Memberlock.Lock()
+	defer Memberlock.Unlock()
 
 	var res ResponseNoData
 
@@ -285,19 +272,19 @@ func UpdateUser(id int64, password string, username string, email string, role i
 	}
 
 	res.Status = http.StatusOK
-	res.Msg = "User updated successfully"
+	res.Msg = "Member updated successfully"
 	res.Success = true
 
 	return res, nil
 }
 
-func WhereUser(col string, val string) (*User, error) {
+func WhereMember(col string, val string) (*Member, error) {
 
-	var obj User
+	var obj Member
 
 	con := A.GetDB()
 
-	sql := "SELECT * FROM users WHERE " + col + " = $1;"
+	sql := "SELECT * FROM members WHERE " + col + " = $1;"
 
 	rows, err := con.Query(sql, val)
 
@@ -311,16 +298,16 @@ func WhereUser(col string, val string) (*User, error) {
 		err := rows.Scan(
 			&obj.ID,
 			&obj.Username,
+			&obj.FullName,
 			&obj.Email,
 			&obj.Password,
-			&obj.LastActive,
+			&obj.PhoneNumber,
+			&obj.Address,
 			&obj.CreatedAt,
 			&obj.UpdatedAt,
-			&obj.CreatedBy,
-			&obj.UpdatedBy,
 			&obj.DeletedAt,
-			&obj.DeletedBy,
-			&obj.Role,
+			&obj.LastActive,
+			&obj.ProfilePic,
 		)
 
 		if err != nil {
@@ -332,14 +319,14 @@ func WhereUser(col string, val string) (*User, error) {
 	return &obj, nil
 }
 
-func SetUserLastActive(id int64) error {
-	lock.Lock()
-	defer lock.Unlock()
+func SetMemberLastActive(id int64) error {
+	Memberlock.Lock()
+	defer Memberlock.Unlock()
 
 	con := A.GetDB()
 
 	sql := `
-		UPDATE public.users SET last_active = NOW() WHERE id = $1;
+		UPDATE public.members SET last_active = NOW() WHERE id = $1;
 	`
 
 	_, err := con.Exec(sql, id)
@@ -347,20 +334,20 @@ func SetUserLastActive(id int64) error {
 	return err
 }
 
-func SetUserProfilePic(path string, id int64) error {
-	lock.Lock()
-	defer lock.Unlock()
+func SetMemberProfilePic(path string, id int64) error {
+	Memberlock.Lock()
+	defer Memberlock.Unlock()
 
 	con := A.GetDB()
 
-	sql := `INSERT INTO public.medias (model_name, model_id, media_type, location) VALUES ('user', $1, 'image', $2);`
+	sql := `INSERT INTO public.medias (model_name, model_id, media_type, location) VALUES ('member', $1, 'image', $2);`
 
 	_, err := con.Exec(sql, id, path)
 
 	return err
 }
 
-func GetUserDataByJWT(c echo.Context) (*JwtCustomClaims, *string) {
+func GetMemberDataByJWT(c echo.Context) (*JwtCustomClaims, *string) {
 
 	var errM string
 
