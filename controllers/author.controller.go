@@ -24,6 +24,24 @@ func GetAllAuthor(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
+func GetAllAuthorIdName(c echo.Context) error {
+	authors, err := M.GetAllAuthorObj()
+
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{
+			"err": err.Error(),
+		})
+	}
+
+	datas := make(map[int]string)
+	
+	for _, val := range authors {
+		datas[val.Id] = val.Name
+	}
+
+	return c.JSON(http.StatusOK, datas)
+}
+
 func CreateAuthor(c echo.Context) error {
 
 	p := &AuthorForm{

@@ -74,6 +74,48 @@ func GetAllAuthor() (ResponseMultiple, error) {
 	return res, nil
 }
 
+func GetAllAuthorObj() ([]Author, error) {
+	var obj Author
+	var arrobj []Author
+
+	con := A.GetDB()
+
+	sql := `
+		SELECT * FROM authors WHERE deleted_at IS NULL;
+	`
+
+	rows, err := con.Query(sql)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		err := rows.Scan(
+			&obj.Id,
+			&obj.Name,
+			&obj.Desc,
+			&obj.CreatedAt,
+			&obj.UpdatedAt,
+			&obj.DeletedAt,
+			&obj.CreatedBy,
+			&obj.UpdatedBy,
+			&obj.DeletedBy,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		arrobj = append(arrobj, obj)
+	}
+
+
+	return arrobj, nil
+}
+
 func FindAuthor(id int64) (Response, error) {
 	var obj Author
 	var res Response

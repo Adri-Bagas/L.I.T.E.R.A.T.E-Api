@@ -60,8 +60,29 @@ func CreateTransaction(c echo.Context) error {
 		return c.JSON(http.StatusOK, res)
 
 	case "INVENTORY_IN":
+		res, err := InventoryIn(*requestBody, *claims)
+
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, res)
+		}
+
+		return c.JSON(http.StatusOK, res)
 	case "INVENTORY_OUT":
+		res, err := InventoryOut(*requestBody, *claims)
+
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, res)
+		}
+
+		return c.JSON(http.StatusOK, res)
 	case "RETURN":
+		res, err := CreateReturn(*requestBody, *claims)
+
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, res)
+		}
+
+		return c.JSON(http.StatusOK, res)
 	case "LOST":
 	}
 

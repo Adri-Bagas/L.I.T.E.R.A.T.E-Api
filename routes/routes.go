@@ -97,6 +97,7 @@ func Init() *echo.Echo {
 	authorRoute := e.Group("/author")
 	authorRoute.Use(echojwt.WithConfig(config))
 	authorRoute.GET("", CR.GetAllAuthor)
+	authorRoute.GET("/all/ids", CR.GetAllAuthorIdName)
 	authorRoute.POST("", CR.CreateAuthor)
 	authorRoute.PUT("/:id", CR.UpdateAuthor)
 	authorRoute.DELETE("/:id", CR.DeletedAuthor)
@@ -123,8 +124,15 @@ func Init() *echo.Echo {
 	categoryRoute.GET("/:id", CR.FindCategory)
 	//Category Group End
 
+	//Transaction Group Start
+	transactionRoute := e.Group("/transaction")
+	transactionRoute.Use(echojwt.WithConfig(config))
+	transactionRoute.POST("", CR.CreateTransaction)
+	//Transaction Group End
+
 	//Login
 	e.POST("/auth/login", CR.Login)
+	e.POST("/auth/login/member", CR.LoginMember)
 	//Auth
 	authRouteSafe := e.Group("/auth")
 	authRouteSafe.Use(echojwt.WithConfig(config))
