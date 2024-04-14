@@ -49,6 +49,7 @@ func GetAllPublisher() (ResponseMultiple, error) {
 		err := rows.Scan(
 			&obj.Id,
 			&obj.Name,
+			&obj.Address,
 			&obj.PhoneNumber,
 			&obj.Desc,
 			&obj.CreatedAt,
@@ -75,6 +76,49 @@ func GetAllPublisher() (ResponseMultiple, error) {
 	res.Datas = arrobj
 
 	return res, nil
+}
+
+func GetAllPublisherObj() ([]Publisher, error) {
+	var obj Publisher
+	var arrobj []Publisher
+
+	con := A.GetDB()
+
+	sql := `
+		SELECT * FROM publishers WHERE deleted_at IS NULL;
+	`
+
+	rows, err := con.Query(sql)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		err := rows.Scan(
+			&obj.Id,
+			&obj.Name,
+			&obj.Address,
+			&obj.PhoneNumber,
+			&obj.Desc,
+			&obj.CreatedAt,
+			&obj.UpdatedAt,
+			&obj.DeletedAt,
+			&obj.CreatedBy,
+			&obj.UpdatedBy,
+			&obj.DeletedBy,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		arrobj = append(arrobj, obj)
+	}
+
+	return arrobj, nil
 }
 
 func FindPublisher(id int64) (Response, error) {

@@ -10,6 +10,7 @@ import (
 
 type CategoryForm struct {
 	Name string `json:"name" validate:"required"`
+	Desc *string `json:"desc"`
 }
 
 func GetAllCategory(c echo.Context) error {
@@ -22,9 +23,31 @@ func GetAllCategory(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
+func GetAllCategoryIdName(c echo.Context) error {
+	category, err := M.GetAllCategoryObj()
+
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{
+			"err": err.Error(),
+		})
+	}
+
+	datas := make(map[int]string)
+	
+	for _, val := range category {
+		datas[val.Id] = val.Name
+	}
+
+	return c.JSON(http.StatusOK, datas)
+}
+
 func CreateCategory(c echo.Context) error {
+
+	desc := c.FormValue("desc")
+
 	p := &CategoryForm{
 		Name: c.FormValue("name"),
+		Desc: &desc,
 	}
 
 	if err := c.Validate(p); err != nil {
@@ -41,6 +64,7 @@ func CreateCategory(c echo.Context) error {
 
 	ca := &M.Category{
 		Name: p.Name,
+		Desc: p.Desc,
 		CreatedBy: &parsedCB,
 	}
 
@@ -60,8 +84,11 @@ func UpdateCategory(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"msg": err.Error()})
 	}
 
+	desc := c.FormValue("desc")
+
 	p := &CategoryForm{
 		Name: c.FormValue("name"),
+		Desc: &desc,
 	}
 
 	if err := c.Validate(p); err != nil {
@@ -79,10 +106,11 @@ func UpdateCategory(c echo.Context) error {
 	ca := &M.Category{
 		Id: int(CategoryId),
 		Name: p.Name,
+		Desc: p.Desc,
 		UpdatedBy: &parsedUB,
 	}
 
-	res, err := M.CreateCategory(ca)
+	res, err := M.UpdateCategory(ca)
 
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, res)

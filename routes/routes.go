@@ -5,12 +5,13 @@ import (
 	"perpus_api/config"
 	CR "perpus_api/controllers"
 
+	M "perpus_api/models"
+
 	"github.com/golang-jwt/jwt/v5"
 	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"gopkg.in/go-playground/validator.v9"
-	M "perpus_api/models"
 )
 
 type (
@@ -66,8 +67,6 @@ func Init() *echo.Echo {
 		SigningKey: []byte(conf.SECRET_TOKEN_A),
 	}
 
-	e.POST("/try/upload/pdf", CR.UploadBookPdfToImage)
-
 	//static files
 	e.Static("/uploads", "uploads")
 
@@ -91,6 +90,7 @@ func Init() *echo.Echo {
 	bookRoute.PUT("/:id", CR.UpdateBook)
 	bookRoute.DELETE("/:id", CR.DeletedBook)
 	bookRoute.GET("/:id", CR.FindBook)
+	bookRoute.POST("/upload/pdf/:id", CR.UploadBookPdfToImage)
 	//Book Group End
 
 	//Author Group Start
@@ -108,6 +108,7 @@ func Init() *echo.Echo {
 	publisherRoute := e.Group("/publisher")
 	publisherRoute.Use(echojwt.WithConfig(config))
 	publisherRoute.GET("", CR.GetAllPublisher)
+	publisherRoute.GET("/all/ids", CR.GetAllPublisherIdName)
 	publisherRoute.POST("", CR.CreatePublisher)
 	publisherRoute.PUT("/:id", CR.UpdatePublisher)
 	publisherRoute.DELETE("/:id", CR.DeletedPublisher)
@@ -118,6 +119,7 @@ func Init() *echo.Echo {
 	categoryRoute := e.Group("/category")
 	categoryRoute.Use(echojwt.WithConfig(config))
 	categoryRoute.GET("", CR.GetAllCategory)
+	categoryRoute.GET("/all/ids", CR.GetAllCategoryIdName)
 	categoryRoute.POST("", CR.CreateCategory)
 	categoryRoute.PUT("/:id", CR.UpdateCategory)
 	categoryRoute.DELETE("/:id", CR.DeletedCategory)

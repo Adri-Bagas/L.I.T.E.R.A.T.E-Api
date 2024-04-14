@@ -25,6 +25,24 @@ func GetAllPublisher(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
+func GetAllPublisherIdName(c echo.Context) error {
+	publishers, err := M.GetAllPublisherObj()
+
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{
+			"err": err.Error(),
+		})
+	}
+
+	datas := make(map[int]string)
+
+	for _, val := range publishers {
+		datas[val.Id] = val.Name
+	}
+
+	return c.JSON(http.StatusOK, datas)
+}
+
 func CreatePublisher(c echo.Context) error {
 
 	p := &PublisherForm{
@@ -45,7 +63,7 @@ func CreatePublisher(c echo.Context) error {
 		Address:     c.FormValue("address"),
 		PhoneNumber: c.FormValue("phone_number"),
 		Desc:        c.FormValue("desc"),
-		CreatedBy:  &parsedCB,
+		CreatedBy:   &parsedCB,
 	}
 
 	res, err := M.CreatePublisher(pu)
@@ -65,7 +83,6 @@ func UpdatePublisher(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"msg": err.Error()})
 	}
 
-
 	p := &PublisherForm{
 		Name:        c.FormValue("name"),
 		Address:     c.FormValue("address"),
@@ -80,12 +97,12 @@ func UpdatePublisher(c echo.Context) error {
 	parsedCB, _ := strconv.ParseInt(c.FormValue("updated_by"), 10, 64)
 
 	bo := &M.Publisher{
-		Id: int(PublisherId),
+		Id:          int(PublisherId),
 		Name:        c.FormValue("name"),
 		Address:     c.FormValue("address"),
 		PhoneNumber: c.FormValue("phone_number"),
 		Desc:        c.FormValue("desc"),
-		CreatedBy: &parsedCB,
+		CreatedBy:   &parsedCB,
 	}
 
 	res, err := M.UpdatePublisher(bo)

@@ -15,6 +15,19 @@ type Media struct {
 
 var MediaLock = sync.Mutex{}
 
+func CreateMedia(path string, id int64, model_name string, filetype string) error {
+	MediaLock.Lock()
+	defer MediaLock.Unlock()
+
+	con := A.GetDB()
+
+	sql := `INSERT INTO public.medias (model_name, model_id, media_type, location) VALUES ($1, $2, $3, $4);`
+
+	_, err := con.Exec(sql, model_name, id, filetype, path)
+
+	return err
+}
+
 func FindMedia(mName string, mId int) (*Media, error) {
 	MediaLock.Lock()
 	defer MediaLock.Unlock()

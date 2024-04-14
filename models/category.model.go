@@ -14,6 +14,7 @@ type Category struct {
 	UpdatedAt *string `db:"updated_at" json:"updated_at"`
 	UpdatedBy *int64  `db:"updated_by" json:"updated_by"`
 	DeletedAt *string `db:"deleted_at" json:"deleted_at"`
+	Desc      *string `db:"desc" json:"desc"`
 }
 
 var CategoryLock = sync.Mutex{}
@@ -50,6 +51,7 @@ func GetAllCategory() (ResponseMultiple, error) {
 			&obj.UpdatedAt,
 			&obj.UpdatedBy,
 			&obj.DeletedAt,
+			&obj.Desc,
 		)
 
 		if err != nil {
@@ -68,6 +70,47 @@ func GetAllCategory() (ResponseMultiple, error) {
 	res.Datas = arrobj
 
 	return res, nil
+}
+
+
+func GetAllCategoryObj() ([]Category, error) {
+	var obj Category
+	var arrobj []Category
+
+	con := A.GetDB()
+
+	sql := `
+		SELECT * FROM categories WHERE deleted_at IS NULL;
+	`
+
+	rows, err := con.Query(sql)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		err := rows.Scan(
+			&obj.Id,
+			&obj.Name,
+			&obj.CreatedAt,
+			&obj.CreatedBy,
+			&obj.UpdatedAt,
+			&obj.UpdatedBy,
+			&obj.DeletedAt,
+			&obj.Desc,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		arrobj = append(arrobj, obj)
+	}
+
+	return arrobj, nil
 }
 
 func FindCategory(id int64) (Response, error) {
@@ -101,6 +144,7 @@ func FindCategory(id int64) (Response, error) {
 			&obj.UpdatedAt,
 			&obj.UpdatedBy,
 			&obj.DeletedAt,
+			&obj.Desc,
 		)
 
 		if err != nil {
@@ -145,6 +189,7 @@ func WhereCategory(col string, val string) (*Category, error) {
 			&obj.UpdatedAt,
 			&obj.UpdatedBy,
 			&obj.DeletedAt,
+			&obj.Desc,
 		)
 
 		if err != nil {
@@ -167,11 +212,11 @@ func CreateCategory(category *Category) (ResponseNoData, error) {
 
 	sql := `
 		INSERT INTO public.categories(
-			name, created_at, created_by)
-		VALUES ($1, NOW(), $2);
+			name, created_at, created_by, desc)
+		VALUES ($1, NOW(), $2, $3);
 	`
 
-	_, err := con.Exec(sql, category.Name, category.CreatedBy)
+	_, err := con.Exec(sql, category.Name, category.CreatedBy, category.Desc)
 
 	if err != nil {
 		res.Status = http.StatusInternalServerError
@@ -225,11 +270,11 @@ func UpdateCategory(category *Category) (ResponseNoData, error) {
 
 	sql := `
 		UPDATE public.categories
-			SET name = $1, updated_at = NOW(), updated_by = $2
-		WHERE id = $3;
+			SET name = $1, updated_at = NOW(), updated_by = $2, desc = $3
+		WHERE id = $4;
 	`
 
-	_, err := con.Exec(sql, category.Name, category.UpdatedBy, category.Id)
+	_, err := con.Exec(sql, category.Name, category.UpdatedBy, category.Desc, category.Id)
 
 	if err != nil {
 		res.Status = http.StatusInternalServerError
