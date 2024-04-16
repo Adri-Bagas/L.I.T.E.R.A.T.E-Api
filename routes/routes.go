@@ -82,10 +82,23 @@ func Init() *echo.Echo {
 	userRoute.POST("/upload/prof", CR.SetUserProfilePic)
 	// User Group End
 
+	// Member Group Start
+	memberRoute := e.Group("/member")
+	memberRoute.Use(echojwt.WithConfig(config))
+	memberRoute.GET("", CR.GetAllMember)
+	memberRoute.POST("", CR.CreateMember)
+	memberRoute.PUT("/:id", CR.UpdateMember)
+	memberRoute.DELETE("/:id", CR.DeletedMember)
+	memberRoute.GET("/:id", CR.FindMember)
+	memberRoute.GET("/thrashed", CR.GetAllThrashedMember)
+	memberRoute.POST("/upload/prof", CR.SetMemberProfilePic)
+	// Member Group End
+
 	//Book Group Start
 	bookRoute := e.Group("/book")
 	bookRoute.Use(echojwt.WithConfig(config))
 	bookRoute.GET("", CR.GetAllBook)
+	bookRoute.GET("/details", CR.GetAllBookDetailsNotBorrowedOrRemoved)
 	bookRoute.POST("", CR.CreateBook)
 	bookRoute.PUT("/:id", CR.UpdateBook)
 	bookRoute.DELETE("/:id", CR.DeletedBook)
@@ -130,6 +143,7 @@ func Init() *echo.Echo {
 	transactionRoute := e.Group("/transaction")
 	transactionRoute.Use(echojwt.WithConfig(config))
 	transactionRoute.POST("", CR.CreateTransaction)
+	transactionRoute.GET("/inventory", CR.GetTransactionInOutDataAll)
 	//Transaction Group End
 
 	//Login

@@ -58,11 +58,11 @@ func GetAllUser(getThrashed bool) (ResponseMultiple, error) {
 
 	if !getThrashed {
 		sql = `
-			SELECT t1.*, t2.location as profile_pic FROM public.users t1 left join public.medias t2 on t1.id = t2.model_id where t1.deleted_at is null;
+			SELECT t1.*, t2.location as profile_pic FROM public.users t1 left join public.medias t2 on t1.id = t2.model_id where t1.deleted_at is null and t2.model_name = 'user';
 		`
 	} else {
 		sql = `
-			SELECT t1.*, t2.location as profile_pic FROM public.users t1 left join public.medias t2 on t1.id = t2.model_id where t1.deleted_at is not null;
+			SELECT t1.*, t2.location as profile_pic FROM public.users t1 left join public.medias t2 on t1.id = t2.model_id where t1.deleted_at is not null and t2.model_name = 'user';
 		`
 	}
 
@@ -128,7 +128,7 @@ func FindUser(id int64) (Response, error) {
 	con := A.GetDB()
 
 	sql := `
-		SELECT t1.*, t2.location as profile_pic FROM public.users t1 left join public.medias t2 on t1.id = t2.model_id WHERE t1.id = $1;
+		SELECT t1.*, t2.location as profile_pic FROM public.users t1 left join public.medias t2 on t1.id = t2.model_id WHERE t1.id = $1 and t2.model_name = 'user';
 	`
 
 	rows, err := con.Query(sql, id)
@@ -176,8 +176,15 @@ func FindUser(id int64) (Response, error) {
 
 	}
 
+	if obj.ID == 0 {
+		res.Status = http.StatusNotFound
+		res.Msg = "User not found!"
+		res.Success = false
+		return res, err
+	}
+
 	res.Status = http.StatusOK
-	res.Msg = "Users founded!"
+	res.Msg = "User founded!"
 	res.Success = true
 	res.Data = obj
 
@@ -195,14 +202,16 @@ func CreateUser(d UserForm) (ResponseNoData, error) {
 
 	hashed, _ := H.HashPassword(d.Password)
 
+	var id *int
+
 	if d.Role == 0 {
 		sql := `
 		INSERT INTO public.members(
 			username, full_name, email, password, phone_number, address)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			VALUES ($1, $2, $3, $4, $5, $6) RETURNING id
 		`
 
-		_, err := con.Exec(sql, d.Username, d.FullName, d.Email, hashed, d.PhoneNumber, d.Address)
+		err := con.QueryRow(sql, d.Username, d.FullName, d.Email, hashed, d.PhoneNumber, d.Address).Scan(&id)
 
 		if err != nil {
 			res.Status = http.StatusInternalServerError
@@ -216,7 +225,7 @@ func CreateUser(d UserForm) (ResponseNoData, error) {
 			VALUES ($1, $2, $3, $4);
 		`
 
-		_, err := con.Exec(sql, d.Username, d.Email, hashed, d.Role)
+		err := con.QueryRow(sql, d.Username, d.FullName, d.Email, hashed, d.PhoneNumber, d.Address).Scan(&id)
 
 		if err != nil {
 			res.Status = http.StatusInternalServerError
@@ -224,6 +233,17 @@ func CreateUser(d UserForm) (ResponseNoData, error) {
 			res.Success = false
 			return res, err
 		}
+	}
+
+	sql := `INSERT INTO public.medias (model_name, model_id, media_type) VALUES ('user', $1, 'image');`
+
+	_, err := con.Exec(sql)
+
+	if err != nil {
+		res.Status = http.StatusInternalServerError
+		res.Msg = err.Error()
+		res.Success = false
+		return res, err
 	}
 
 	res.Status = http.StatusOK

@@ -41,7 +41,6 @@ type MemberForm struct {
 	Username    string  `json:"username" validate:"required"`
 	Email       string  `json:"email" validate:"required,email"`
 	Password    string  `json:"password" validate:"required"`
-	Role        int64   `json:"role"`
 	FullName    *string `json:"full_name"`
 	PhoneNumber *string `json:"phone_number"`
 	Address     *string `json:"address"`
@@ -60,11 +59,11 @@ func GetAllMember(getThrashed bool) (ResponseMultiple, error) {
 
 	if !getThrashed {
 		sql = `
-			SELECT t1.*, t2.location as profile_pic FROM public.members t1 left join public.medias t2 on t1.id = t2.model_id where t1.deleted_at and model_name = "member" is null;
+			SELECT t1.*, t2.location as profile_pic FROM public.members t1 left join public.medias t2 on t1.id = t2.model_id where t1.deleted_at is null and model_name = 'member';
 		`
 	} else {
 		sql = `
-			SELECT t1.*, t2.location as profile_pic FROM public.members t1 left join public.medias t2 on t1.id = t2.model_id where t1.deleted_at and model_name = "member" is not null;
+			SELECT t1.*, t2.location as profile_pic FROM public.members t1 left join public.medias t2 on t1.id = t2.model_id where t1.deleted_at is not null and model_name = 'member';
 		`
 	}
 
@@ -117,7 +116,7 @@ func GetAllMember(getThrashed bool) (ResponseMultiple, error) {
 	}
 
 	res.Status = http.StatusOK
-	res.Msg = "Users founded!"
+	res.Msg = "Members founded!"
 	res.Success = true
 	res.Datas = arrobj
 
@@ -132,7 +131,7 @@ func FindMember(id int64) (Response, error) {
 	con := A.GetDB()
 
 	sql := `
-		SELECT t1.*, t2.location as profile_pic FROM public.members t1 left join public.medias t2 on t1.id = t2.model_id WHERE t1.id = $1;
+		SELECT t1.*, t2.location as profile_pic FROM public.members t1 left join public.medias t2 on t1.id = t2.model_id WHERE t1.id = $1 and t2.model_name = 'member';
 	`
 
 	rows, err := con.Query(sql, id)
@@ -179,6 +178,13 @@ func FindMember(id int64) (Response, error) {
 
 	}
 
+	if obj.ID == 0 {
+		res.Status = http.StatusNotFound
+		res.Msg = "Member not found!"
+		res.Success = false
+		return res, err
+	}
+
 	res.Status = http.StatusOK
 	res.Msg = "Members founded!"
 	res.Success = true
@@ -201,10 +207,23 @@ func CreateMember(d MemberForm) (ResponseNoData, error) {
 	sql := `
 		INSERT INTO public.members(
 			username, full_name, email, password, phone_number, address)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			VALUES ($1, $2, $3, $4, $5, $6) RETURNING id
 		`
 
-	_, err := con.Exec(sql, d.Username, d.FullName, d.Email, hashed, d.PhoneNumber, d.Address)
+	var id *int
+
+	err := con.QueryRow(sql, d.Username, d.FullName, d.Email, hashed, d.PhoneNumber, d.Address).Scan(&id)
+
+	if err != nil {
+		res.Status = http.StatusInternalServerError
+		res.Msg = err.Error()
+		res.Success = false
+		return res, err
+	}
+
+	sql = `INSERT INTO public.medias (model_name, model_id, media_type) VALUES ('member', $1, 'image');`
+
+	_, err = con.Exec(sql, id)
 
 	if err != nil {
 		res.Status = http.StatusInternalServerError
@@ -248,7 +267,7 @@ func DeleteMember(id int64) (ResponseNoData, error) {
 	return res, nil
 }
 
-func UpdateMember(id int64, password string, username string, email string, role int64) (ResponseNoData, error) {
+func UpdateMember(id int64, d MemberForm) (ResponseNoData, error) {
 	Memberlock.Lock()
 	defer Memberlock.Unlock()
 
@@ -256,13 +275,15 @@ func UpdateMember(id int64, password string, username string, email string, role
 
 	con := A.GetDB()
 
-	hashed, _ := H.HashPassword(password)
+	hashed, _ := H.HashPassword(d.Password)
 
 	sql := `
-		UPDATE public.users SET username = $1, email = $2, "password" = $3, role = $4, updated_at = NOW() WHERE id = $5;
+	UPDATE public.members
+	SET username=$1, full_name=$2, email=$4, password=$5, phone_number=$6, address=$7, updated_at = NOW()
+	WHERE id=$8;
 	`
 
-	_, err := con.Exec(sql, username, email, hashed, role, id)
+	_, err := con.Exec(sql, d.Username, d.FullName, d.Email, hashed, d.PhoneNumber, d.Address, id)
 
 	if err != nil {
 		res.Status = http.StatusInternalServerError

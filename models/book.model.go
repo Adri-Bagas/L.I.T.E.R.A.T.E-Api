@@ -12,33 +12,90 @@ import (
 )
 
 type Book struct {
-	Id          int      `json:"id" db:"id"`
-	ISBN        string   `json:"ISBN" db:"ISBN"`
-	Title       string   `json:"title" db:"title"`
-	Lang        string   `json:"lang" db:"lang"`
-	NumOfPages  *int     `json:"num_of_pages" db:"num_of_pages"`
-	Price       *int     `json:"price" db:"price"`
-	Desc        *string  `json:"desc" db:"desc"`
-	CreatedAt   *string  `db:"created_at" json:"created_at"`
-	UpdatedAt   *string  `db:"updated_at" json:"updated_at"`
-	DeletedAt   *string  `db:"deleted_at" json:"deleted_at"`
-	CreatedBy   *int64   `db:"created_by" json:"created_by"`
-	UpdatedBy   *int64   `db:"updated_by" json:"updated_by"`
-	DeletedBy   *int64   `db:"deleted_by" json:"deleted_by"`
-	PublisherId *int64   `db:"publisher_id" json:"publisher_id"`
-	IsEnabled   bool     `json:"is_enabled" db:"is_enabled"`
-	IsOnline    bool     `json:"is_online" db:"is_online"`
-	Stock       int      `db:"stock" json:"stock"`
-	Authors     []string `json:"authors,omitempty"`
-	Publishers  string   `json:"publisher,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
-	Categories  []string `json:"categories,omitempty"`
-	AuthorsId   []int64  `json:"authors_id,omitempty"`
-	TagsId        []int64 `json:"tags_id,omitempty"`
-	CategoriesId  []int64 `json:"categories_id,omitempty"`
+	Id           int      `json:"id" db:"id"`
+	ISBN         string   `json:"ISBN" db:"ISBN"`
+	Title        string   `json:"title" db:"title"`
+	Lang         string   `json:"lang" db:"lang"`
+	NumOfPages   *int     `json:"num_of_pages" db:"num_of_pages"`
+	Price        *int     `json:"price" db:"price"`
+	Desc         *string  `json:"desc" db:"desc"`
+	CreatedAt    *string  `db:"created_at" json:"created_at"`
+	UpdatedAt    *string  `db:"updated_at" json:"updated_at"`
+	DeletedAt    *string  `db:"deleted_at" json:"deleted_at"`
+	CreatedBy    *int64   `db:"created_by" json:"created_by"`
+	UpdatedBy    *int64   `db:"updated_by" json:"updated_by"`
+	DeletedBy    *int64   `db:"deleted_by" json:"deleted_by"`
+	PublisherId  *int64   `db:"publisher_id" json:"publisher_id"`
+	IsEnabled    bool     `json:"is_enabled" db:"is_enabled"`
+	IsOnline     bool     `json:"is_online" db:"is_online"`
+	Stock        int      `db:"stock" json:"stock"`
+	Authors      []string `json:"authors,omitempty"`
+	Publishers   string   `json:"publisher,omitempty"`
+	Tags         []string `json:"tags,omitempty"`
+	Categories   []string `json:"categories,omitempty"`
+	AuthorsId    []int64  `json:"authors_id,omitempty"`
+	TagsId       []int64  `json:"tags_id,omitempty"`
+	CategoriesId []int64  `json:"categories_id,omitempty"`
+}
+
+type BookDetails struct {
+	Id int64 `json:"id"`
+	Title        string `json:"title" db:"title"`
+	SerialNumber string `json:"sn"`
+	Condition    string `json:"condition"`
+	Status       string `json:"status"`
 }
 
 var BookLock = sync.Mutex{}
+
+func GetAllBookDetailsNotBorrowedOrRemoved() (ResponseMultiple, error) {
+	var obj BookDetails
+	var arrobj []BookDetails
+	var res ResponseMultiple
+
+	con := A.GetDB()
+
+	sql := `
+	SELECT t1.id, t2.title, t1.serial_number, t1.condition, t1.status FROM public.book_details t1 inner join public.books t2 on t2.id = t1.book_id where t1.status != 'REMOVED' AND t1.status != 'BORROWED';
+	`
+	rows, err := con.Query(sql)
+
+	if err != nil {
+		res.Status = http.StatusInternalServerError
+		res.Msg = err.Error()
+		res.Success = false
+
+		return res, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		err := rows.Scan(
+			&obj.Id,
+			&obj.Title,
+			&obj.SerialNumber,
+			&obj.Condition,
+			&obj.Status,
+		)
+
+		if err != nil {
+			res.Status = http.StatusInternalServerError
+			res.Msg = err.Error()
+			res.Success = false
+			return res, err
+		}
+
+		arrobj = append(arrobj, obj)
+	}
+
+	res.Status = http.StatusOK
+	res.Msg = "Books details founded!"
+	res.Success = true
+	res.Datas = arrobj
+
+	return res, nil
+}
 
 func GetAllBook() (ResponseMultiple, error) {
 	var obj Book

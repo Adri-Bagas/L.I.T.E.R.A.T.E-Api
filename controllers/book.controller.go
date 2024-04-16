@@ -42,6 +42,16 @@ func GetAllBook(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
+func GetAllBookDetailsNotBorrowedOrRemoved(c echo.Context) error {
+	res, err := M.GetAllBookDetailsNotBorrowedOrRemoved()
+
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, res)
+	}
+
+	return c.JSON(http.StatusOK, res)
+}
+
 func CreateBook(c echo.Context) error {
 
 	requestBody := new(BookForm)

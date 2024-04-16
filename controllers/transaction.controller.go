@@ -26,12 +26,85 @@ type TransactionForm struct {
 	PenaltyFee          *int                    `json:"penalty"`
 }
 
+type TransactionInventoryInOut struct {
+	Id        int64   `json:"id"`
+	Date      *string `json:"date"`
+	Detail    *string `json:"detail"`
+	CreatedAt *string `json:"created_at"`
+	Approver  M.User  `json:"approver"`
+}
+
 var TransactionLock = sync.Mutex{}
 
-func CreateTransaction(c echo.Context) error {
+func GetTransactionInOutDataAll(c echo.Context) error {
 
-	TransactionLock.Lock()
-	defer TransactionLock.Unlock()
+	var obj TransactionInventoryInOut
+	var arrobj []TransactionInventoryInOut
+	var res M.ResponseMultiple
+
+	con := A.GetDB()
+
+	trans_type := c.FormValue("type")
+
+	sql := "select t1.id as trans_id, t1.date, t1.detail, t1.created_at, t2.* from public.transactions t1 inner join public.users t2 on t1.approver_id = t2.id where transaction_type = '" + trans_type + "';"
+
+	rows, err := con.Query(sql)
+
+	if err != nil {
+		res.Status = http.StatusInternalServerError
+		res.Msg = err.Error()
+		res.Success = false
+
+		return c.JSON(http.StatusInternalServerError, res)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+
+		var user M.User
+
+		err := rows.Scan(
+			&obj.Id,
+			&obj.Date,
+			&obj.Detail,
+			&obj.CreatedAt,
+			&user.ID,
+			&user.Username,
+			&user.Email,
+			&user.Password,
+			&user.LastActive,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+			&user.CreatedBy,
+			&user.UpdatedBy,
+			&user.DeletedAt,
+			&user.DeletedBy,
+			&user.Role,
+		)
+
+		if err != nil {
+			res.Status = http.StatusInternalServerError
+			res.Msg = err.Error()
+			res.Success = false
+			return c.JSON(http.StatusInternalServerError, res)
+		}
+
+		obj.Approver = user
+
+		arrobj = append(arrobj, obj)
+
+	}
+
+	res.Status = http.StatusOK
+	res.Msg = "Founded Transaction!"
+	res.Success = true
+	res.Datas = arrobj
+
+	return c.JSON(http.StatusOK, res)
+
+}
+
+func CreateTransaction(c echo.Context) error {
 
 	requestBody := new(TransactionForm)
 
@@ -212,7 +285,7 @@ func InventoryIn(data TransactionForm, claims M.JwtCustomClaims) (M.ResponseNoDa
 
 	var res M.ResponseNoData
 
-	if data.BooksId == nil {
+	if data.BooksQty == nil {
 		res.Status = http.StatusInternalServerError
 		res.Msg = "Books cannot be nil!"
 		res.Success = false
@@ -340,6 +413,12 @@ func InventoryOut(data TransactionForm, claims M.JwtCustomClaims) (M.ResponseNoD
 		VALUES ($1, $2, $3, NOW(), $4, $5, $6) RETURNING id;
 	`
 
+	sqlInsertTransactionDetail := `
+	INSERT INTO public.transaction_detail(
+		transaction_id, detail_book_id, created_at)
+		VALUES ($1, $2, NOW());
+	`
+
 	sqlDelete := `
 	UPDATE public.book_details
 		SET status= $1
@@ -369,7 +448,7 @@ func InventoryOut(data TransactionForm, claims M.JwtCustomClaims) (M.ResponseNoD
 			res.Status = http.StatusInternalServerError
 			res.Msg = err.Error()
 			res.Success = false
-			return res, nil
+			return res, err
 		}
 	}
 
@@ -380,8 +459,18 @@ func InventoryOut(data TransactionForm, claims M.JwtCustomClaims) (M.ResponseNoD
 			res.Status = http.StatusInternalServerError
 			res.Msg = err.Error()
 			res.Success = false
-			return res, nil
+			return res, err
 		}
+
+		_, err = con.Exec(sqlInsertTransactionDetail, transId, value)
+
+		if err != nil {
+			res.Status = http.StatusInternalServerError
+			res.Msg = err.Error()
+			res.Success = false
+			return res, err
+		}
+
 	}
 
 	res.Status = http.StatusOK
@@ -463,46 +552,46 @@ func CreateReturn(data TransactionForm, claims M.JwtCustomClaims) (M.ResponseNoD
 		WHERE id = $2
 	`
 
-		//update book statuses
-		for _, elem := range *data.BooksId {
-			var book_id *int
-			var status *string
-			var condition *string
-	
-			err := con.QueryRow(sqlFind, elem).Scan(&book_id, &status, &condition)
-	
-			if err != nil {
-				res.Status = http.StatusInternalServerError
-				res.Msg = err.Error()
-				res.Success = false
-				return res, err
-			}
-	
-			if *status == "REMOVED" || *status == "MISSING" {
-				res.Status = http.StatusInternalServerError
-				res.Msg = "Book is missing or already removed!"
-				res.Success = false
-				return res, err
-			}
-	
-			_, err = con.Exec(sql, transId, book_id, elem, condition)
-	
-			if err != nil {
-				res.Status = http.StatusInternalServerError
-				res.Msg = err.Error()
-				res.Success = false
-				return res, err
-			}
-	
-			_, err = con.Exec(sqlUpdate, "STORED", elem)
-	
-			if err != nil {
-				res.Status = http.StatusInternalServerError
-				res.Msg = err.Error()
-				res.Success = false
-				return res, err
-			}
+	//update book statuses
+	for _, elem := range *data.BooksId {
+		var book_id *int
+		var status *string
+		var condition *string
+
+		err := con.QueryRow(sqlFind, elem).Scan(&book_id, &status, &condition)
+
+		if err != nil {
+			res.Status = http.StatusInternalServerError
+			res.Msg = err.Error()
+			res.Success = false
+			return res, err
 		}
+
+		if *status == "REMOVED" || *status == "MISSING" {
+			res.Status = http.StatusInternalServerError
+			res.Msg = "Book is missing or already removed!"
+			res.Success = false
+			return res, err
+		}
+
+		_, err = con.Exec(sql, transId, book_id, elem, condition)
+
+		if err != nil {
+			res.Status = http.StatusInternalServerError
+			res.Msg = err.Error()
+			res.Success = false
+			return res, err
+		}
+
+		_, err = con.Exec(sqlUpdate, "STORED", elem)
+
+		if err != nil {
+			res.Status = http.StatusInternalServerError
+			res.Msg = err.Error()
+			res.Success = false
+			return res, err
+		}
+	}
 
 	res.Status = http.StatusOK
 	res.Msg = "Success to create transaction!"
