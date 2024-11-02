@@ -84,25 +84,34 @@ func Init() *echo.Echo {
 
 	// Member Group Start
 	memberRoute := e.Group("/member")
+	e.POST("/member/register", CR.CreateMember)
 	memberRoute.Use(echojwt.WithConfig(config))
 	memberRoute.GET("", CR.GetAllMember)
 	memberRoute.POST("", CR.CreateMember)
 	memberRoute.PUT("/:id", CR.UpdateMember)
 	memberRoute.DELETE("/:id", CR.DeletedMember)
 	memberRoute.GET("/:id", CR.FindMember)
+	memberRoute.GET("/:id/details", CR.FindMemberWithTransaction)
 	memberRoute.GET("/thrashed", CR.GetAllThrashedMember)
+	memberRoute.GET("/all/ids", CR.GetAllMemberIdName)
 	memberRoute.POST("/upload/prof", CR.SetMemberProfilePic)
 	// Member Group End
 
 	//Book Group Start
+	e.POST("/book/acc/keys", CR.GetBookDataFromAccessKey)
 	bookRoute := e.Group("/book")
 	bookRoute.Use(echojwt.WithConfig(config))
 	bookRoute.GET("", CR.GetAllBook)
+	bookRoute.GET("/recom", CR.GetBookRecom)
+	bookRoute.GET("/acc", CR.GetBookReaded)
+	bookRoute.POST("/gen", CR.GenBookAccessKey)
+	bookRoute.GET("/coll", CR.GetBookCollections)
 	bookRoute.GET("/details", CR.GetAllBookDetailsNotBorrowedOrRemoved)
 	bookRoute.POST("", CR.CreateBook)
 	bookRoute.PUT("/:id", CR.UpdateBook)
 	bookRoute.DELETE("/:id", CR.DeletedBook)
 	bookRoute.GET("/:id", CR.FindBook)
+	bookRoute.GET("/:id/details", CR.FindBookWithBookDetails)
 	bookRoute.POST("/upload/pdf/:id", CR.UploadBookPdfToImage)
 	//Book Group End
 
@@ -144,7 +153,23 @@ func Init() *echo.Echo {
 	transactionRoute.Use(echojwt.WithConfig(config))
 	transactionRoute.POST("", CR.CreateTransaction)
 	transactionRoute.GET("/inventory", CR.GetTransactionInOutDataAll)
+	transactionRoute.GET("/loan", CR.GetLoanDataAll)
+	transactionRoute.GET("/return", CR.GetReturnDataAll)
+	transactionRoute.GET("/loan/:id", CR.GetFindLoanDataWithBooks)
+	transactionRoute.GET("/loan/all/ids", CR.GetLoanDataAllIded)
 	//Transaction Group End
+
+	//Reviews Group Start
+	reviewsRoute := e.Group("/reviews")
+	reviewsRoute.Use(echojwt.WithConfig(config))
+	reviewsRoute.POST("", CR.CreateReviews)
+	//Reviews Group End
+
+	e.GET("/dahsboard/chart/bar", CR.GetDataDashboardChart)
+	e.GET("/dahsboard/counts", CR.GetDataCountAndSumDashboard)
+	reportRoute := e.Group("/report")
+	reportRoute.Use(echojwt.WithConfig(config))
+	reportRoute.POST("", CR.GetTransactionExcel)
 
 	//Login
 	e.POST("/auth/login", CR.Login)

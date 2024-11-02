@@ -11,10 +11,10 @@ import (
 )
 
 type User struct {
-	ID         int64   `db:"id" json:"id"`
-	Username   string  `db:"username" json:"username"`
-	Email      string  `db:"email" json:"email"`
-	Password   string  `db:"password" json:"password"`
+	ID         *int64  `db:"id" json:"id"`
+	Username   *string `db:"username" json:"username"`
+	Email      *string `db:"email" json:"email"`
+	Password   *string `db:"password" json:"password,omitempty"`
 	LastActive *string `db:"last_active" json:"last_active"`
 	CreatedAt  *string `db:"created_at" json:"created_at"`
 	UpdatedAt  *string `db:"updated_at" json:"updated_at"`
@@ -22,7 +22,7 @@ type User struct {
 	CreatedBy  *int64  `db:"created_by" json:"created_by"`
 	UpdatedBy  *int64  `db:"updated_by" json:"updated_by"`
 	DeletedBy  *int64  `db:"deleted_by" json:"deleted_by"`
-	Role       int     `db:"role" json:"role"`
+	Role       *int     `db:"role" json:"role"`
 	ProfilePic *string `db:"profile_pic" json:"profile_pic"`
 }
 
@@ -33,6 +33,7 @@ type UserSafe struct {
 	LastActive *string `json:"last_active"`
 	DeletedAt  *string `json:"deleted_at"`
 	ProfilePic *string `json:"profile_pic"`
+	Role       int     `json:"role"`
 }
 
 type UserForm struct {
@@ -103,9 +104,9 @@ func GetAllUser(getThrashed bool) (ResponseMultiple, error) {
 		}
 
 		arrobj = append(arrobj, UserSafe{
-			ID:         obj.ID,
-			Username:   obj.Username,
-			Email:      obj.Email,
+			ID:         *obj.ID,
+			Username:   *obj.Username,
+			Email:      *obj.Email,
 			LastActive: obj.LastActive,
 			DeletedAt:  obj.DeletedAt,
 			ProfilePic: obj.ProfilePic,
@@ -176,7 +177,7 @@ func FindUser(id int64) (Response, error) {
 
 	}
 
-	if obj.ID == 0 {
+	if *obj.ID == 0 {
 		res.Status = http.StatusNotFound
 		res.Msg = "User not found!"
 		res.Success = false
@@ -222,10 +223,10 @@ func CreateUser(d UserForm) (ResponseNoData, error) {
 	} else {
 		sql := `
 			INSERT INTO public.users(username, email, password, role)
-			VALUES ($1, $2, $3, $4);
+			VALUES ($1, $2, $3, $4) RETURNING id;
 		`
 
-		err := con.QueryRow(sql, d.Username, d.FullName, d.Email, hashed, d.PhoneNumber, d.Address).Scan(&id)
+		err := con.QueryRow(sql, d.Username, d.Email, hashed, d.Role).Scan(&id)
 
 		if err != nil {
 			res.Status = http.StatusInternalServerError
@@ -237,7 +238,7 @@ func CreateUser(d UserForm) (ResponseNoData, error) {
 
 	sql := `INSERT INTO public.medias (model_name, model_id, media_type) VALUES ('user', $1, 'image');`
 
-	_, err := con.Exec(sql)
+	_, err := con.Exec(sql, *id)
 
 	if err != nil {
 		res.Status = http.StatusInternalServerError

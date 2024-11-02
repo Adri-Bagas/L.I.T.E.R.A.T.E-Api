@@ -274,7 +274,7 @@ func UpdateCategory(category *Category) (ResponseNoData, error) {
 		WHERE id = $4;
 	`
 
-	_, err := con.Exec(sql, category.Name, category.UpdatedBy, category.Desc, category.Id)
+	_, err := con.Exec(sql, category.Name, category.UpdatedBy, *category.Desc, category.Id)
 
 	if err != nil {
 		res.Status = http.StatusInternalServerError

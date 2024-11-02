@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	M "perpus_api/models"
+	A "perpus_api/db"
 	"strconv"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -29,6 +30,123 @@ func GetAllThrashedMember(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, res)
+}
+
+func FindMemberWithTransaction(c echo.Context) error {
+	memberId, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	var res M.Response
+
+	con := A.GetDB()
+
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"msg": err.Error()})
+	}
+
+	member, err := M.FindMemberObj(memberId)
+
+	if err != nil {
+		res.Status = http.StatusInternalServerError
+		res.Msg = err.Error()
+		res.Success = false
+		return c.JSON(http.StatusInternalServerError, res)
+	}
+
+	sql := `
+	select 
+		t1.id as trans_id, 
+		t1.date, 
+		t1.detail, 
+		t1.created_at, 
+		t1.expected_return_date,
+		t1.approval_status,
+		t1.is_returned,
+		t2.* 
+	from public.transactions t1 
+		inner join public.users t2 on t1.approver_id = t2.id 
+	where transaction_type = 'LOAN' and member_id = $1;
+	`
+
+	var obj M.TransactionLoan
+	var arrobj []M.TransactionLoan
+
+	rows, err := con.Query(sql, memberId)
+
+	if err != nil {
+		res.Status = http.StatusInternalServerError
+		res.Msg = err.Error()
+		res.Success = false
+
+		return c.JSON(http.StatusInternalServerError, res)
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+
+		var user M.User
+
+		err := rows.Scan(
+			&obj.Id,
+			&obj.Date,
+			&obj.Detail,
+			&obj.CreatedAt,
+			&obj.ExpectedReturnDate,
+			&obj.ApprovalStatus,
+			&obj.IsReturned,
+			&user.ID,
+			&user.Username,
+			&user.Email,
+			&user.Password,
+			&user.LastActive,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+			&user.CreatedBy,
+			&user.UpdatedBy,
+			&user.DeletedAt,
+			&user.DeletedBy,
+			&user.Role,
+		)
+
+		if err != nil {
+			res.Status = http.StatusInternalServerError
+			res.Msg = err.Error()
+			res.Success = false
+			return c.JSON(http.StatusInternalServerError, res)
+		}
+
+		*user.Password = ""
+
+		obj.Approver = &user
+
+		arrobj = append(arrobj, obj)
+	}
+
+	member.Transaction = &arrobj
+
+	res.Status = http.StatusOK
+	res.Msg = "Founded Member and transactions!"
+	res.Success = true
+	res.Data = member
+
+	return c.JSON(http.StatusOK, res)
+}
+
+func GetAllMemberIdName(c echo.Context) error {
+	category, err := M.GetAllMemberObj()
+
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{
+			"err": err.Error(),
+		})
+	}
+
+	datas := make(map[int]string)
+	
+	for _, val := range category {
+		datas[int(val.ID)] = val.FullName
+	}
+
+	return c.JSON(http.StatusOK, datas)
 }
 
 func CreateMember(c echo.Context) error {

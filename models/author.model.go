@@ -177,6 +177,8 @@ func CreateAuthor(author *Author) (ResponseNoData, error) {
 
 	con := A.GetDB()
 
+	// tx, err := con.Begin()
+
 	sql := `
 		INSERT INTO public.authors(
 			name, "desc", created_at, created_by)
@@ -207,6 +209,8 @@ func DeleteAuthor(id int64) (ResponseNoData, error) {
 
 	con := A.GetDB()
 
+	// tx, err := con.Begin()
+
 	sql := `
 		UPDATE public.authors SET deleted_at = NOW() WHERE id = $1;
 	`
@@ -234,6 +238,8 @@ func UpdateAuthor(author *Author) (ResponseNoData, error) {
 	var res ResponseNoData
 
 	con := A.GetDB()
+
+	// tx, err := con.Begin()
 
 	sql := `
 		UPDATE public.authors

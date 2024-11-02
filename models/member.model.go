@@ -11,18 +11,19 @@ import (
 )
 
 type Member struct {
-	ID          int64   `db:"id" json:"id"`
-	Username    string  `db:"username" json:"username"`
-	FullName    string  `db:"full_name" json:"full_name"`
-	Email       string  `db:"email" json:"email"`
-	Password    string  `db:"password" json:"password"`
-	PhoneNumber string  `db:"phone_number" json:"phone_number"`
-	Address     string  `db:"address" json:"address"`
-	CreatedAt   *string `db:"created_at" json:"created_at"`
-	UpdatedAt   *string `db:"updated_at" json:"updated_at"`
-	DeletedAt   *string `db:"deleted_at" json:"deleted_at"`
-	LastActive  *string `db:"last_active" json:"last_active"`
-	ProfilePic  *string `db:"profile_pic" json:"profile_pic"`
+	ID          int64              `db:"id" json:"id"`
+	Username    string             `db:"username" json:"username"`
+	FullName    string             `db:"full_name" json:"full_name"`
+	Email       string             `db:"email" json:"email"`
+	Password    string             `db:"password" json:"password,omitempty"`
+	PhoneNumber string             `db:"phone_number" json:"phone_number"`
+	Address     string             `db:"address" json:"address"`
+	CreatedAt   *string            `db:"created_at" json:"created_at"`
+	UpdatedAt   *string            `db:"updated_at" json:"updated_at"`
+	DeletedAt   *string            `db:"deleted_at" json:"deleted_at"`
+	LastActive  *string            `db:"last_active" json:"last_active"`
+	ProfilePic  *string            `db:"profile_pic" json:"profile_pic"`
+	Transaction *[]TransactionLoan `json:"transactions"`
 }
 
 type MemberSafe struct {
@@ -193,6 +194,98 @@ func FindMember(id int64) (Response, error) {
 	return res, nil
 }
 
+func FindMemberObj(id int64) (*Member, error) {
+	var obj Member
+	// var objSafe MemberSaf
+
+	con := A.GetDB()
+
+	sql := `
+		SELECT t1.*, t2.location as profile_pic FROM public.members t1 left join public.medias t2 on t1.id = t2.model_id WHERE t1.id = $1 and t2.model_name = 'member';
+	`
+
+	rows, err := con.Query(sql, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		err := rows.Scan(
+			&obj.ID,
+			&obj.Username,
+			&obj.FullName,
+			&obj.Email,
+			&obj.Password,
+			&obj.PhoneNumber,
+			&obj.Address,
+			&obj.CreatedAt,
+			&obj.UpdatedAt,
+			&obj.DeletedAt,
+			&obj.LastActive,
+			&obj.ProfilePic,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+	}
+
+	if obj.ID == 0 {
+		return nil, err
+	}
+
+	obj.Password = ""
+
+	return &obj, nil
+}
+
+func GetAllMemberObj() ([]Member, error) {
+	var obj Member
+	var arrobj []Member
+
+	con := A.GetDB()
+
+	sql := `
+		SELECT * FROM members WHERE deleted_at IS NULL;
+	`
+
+	rows, err := con.Query(sql)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		err := rows.Scan(
+			&obj.ID,
+			&obj.Username,
+			&obj.FullName,
+			&obj.Email,
+			&obj.Password,
+			&obj.PhoneNumber,
+			&obj.Address,
+			&obj.CreatedAt,
+			&obj.UpdatedAt,
+			&obj.DeletedAt,
+			&obj.LastActive,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		arrobj = append(arrobj, obj)
+	}
+
+	return arrobj, nil
+}
+
 func CreateMember(d MemberForm) (ResponseNoData, error) {
 
 	Memberlock.Lock()
@@ -305,7 +398,7 @@ func WhereMember(col string, val string) (*Member, error) {
 
 	con := A.GetDB()
 
-	sql := "SELECT * FROM members WHERE " + col + " = $1;"
+	sql := "SELECT t1.*, t2.location FROM members t1 left join public.medias t2 on t1.id = t2.model_id WHERE t1." + col + " = $1;"
 
 	rows, err := con.Query(sql, val)
 

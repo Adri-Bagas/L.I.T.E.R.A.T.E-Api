@@ -29,14 +29,14 @@ func Login(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, res)
 	}
 
-	if userData.ID == 0 {
+	if *userData.ID == 0 {
 		res.Status = http.StatusInternalServerError
 		res.Msg = "User not found!"
 		res.Success = false
 		return c.JSON(http.StatusInternalServerError, res)
 	}
 
-	check := H.CheckPasswordHash(password, userData.Password)
+	check := H.CheckPasswordHash(password, *userData.Password)
 
 	if !check {
 		res.Status = http.StatusBadRequest
@@ -46,7 +46,7 @@ func Login(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, res)
 	}
 
-	err = M.SetUserLastActive(userData.ID)
+	err = M.SetUserLastActive(*userData.ID)
 
 	if(err != nil){
 		res.Status = http.StatusBadRequest
@@ -56,7 +56,7 @@ func Login(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, res)
 	}
 
-	if(userData.Role == 0){
+	if(*userData.Role == 0){
 		res.Status = http.StatusUnauthorized
 		res.Msg = "Unauthorized!"
 		res.Success = false
@@ -65,10 +65,10 @@ func Login(c echo.Context) error {
 	}
 
 	claims := &M.JwtCustomClaims{
-		ID: int(userData.ID),
-		Name:  userData.Username,
-		Email: userData.Email,
-		Role: userData.Role,
+		ID: int(*userData.ID),
+		Name:  *userData.Username,
+		Email: *userData.Email,
+		Role: *userData.Role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 72)),
 		},
@@ -93,10 +93,11 @@ func Login(c echo.Context) error {
 	res.Data = echo.Map{
 		"token": t,
 		"user":  M.UserSafe{
-			ID: userData.ID,
-			Username: userData.Username,
-			Email: userData.Email,
+			ID: *userData.ID,
+			Username: *userData.Username,
+			Email: *userData.Email,
 			LastActive: userData.LastActive,
+			Role: *userData.Role,
 		},
 	}
 
